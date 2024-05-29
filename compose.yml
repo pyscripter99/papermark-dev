@@ -1,0 +1,50 @@
+name: papermark-dev
+services:
+  papermark:
+    build: ./
+    ports:
+      - 3000:3000
+    volumes:
+      - ./:/papermark
+      - /papermark/node_modules
+    depends_on:
+      - db
+    profiles:
+      - "" # run when not in init profile
+  init:
+    profiles:
+      - "init-db"
+    image: node:lts-alpine3.20
+    working_dir: /papermark
+    volumes:
+      - .:/papermark
+    environment:
+      DATABASE_URL: postgres://postgres:password@db:5432/postgres
+    depends_on:
+      - db
+    command: sh -c "npm ci && npx prisma generate && npx prisma migrate deploy"
+    restart: no
+  minio:
+    ports:
+      - 9000:9000
+      - 9001:9001
+    volumes:
+      - ./dev/minio/data:/data
+    environment:
+      - MINIO_ROOT_USER=user
+      - MINIO_ROOT_PASSWORD=password
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9001"
+    profiles:
+      - "" # run when not in init profile
+  db:
+    image: postgres
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./dev/postgres/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
